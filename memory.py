@@ -4,17 +4,20 @@ import numpy as np
 
 
 class Memory:
-    buffer = deque(maxlen=10000)
-    Sample = namedtuple('Sample', ['current_obs', 'current_action', 'next_obs', 'reward', 'done'])
+
+    def __init__(self, batch_size=32):
+        self.buffer = deque(maxlen=10000)
+        self.batch_size = batch_size
+        self.Sample = namedtuple('Sample', ['current_obs', 'current_action', 'next_obs', 'reward', 'done'])
 
     def add(self, curr_obs, curr_action, next_obs, reward, done=False):
-        if self.buffer.full():
+        if len(self.buffer) == 10000:
             self.buffer.popleft()
 
         self.buffer.append(self.Sample(curr_obs, curr_action, next_obs, reward, done))
 
-    def sample(self, batch_size=32):
-        rand_samp = random.sample(self.buffer, batch_size)
+    def sample(self):
+        rand_samp = random.sample(self.buffer, self.batch_size)
 
         current_obs = []
         current_action = []
@@ -36,3 +39,17 @@ class Memory:
         done = np.asarray(done)
 
         return current_obs, current_action, next_obs, reward, done
+
+
+if __name__ == "__main__":
+    test = Memory()
+    for i in range(100):
+        curr_obs = np.random.rand(6, 7)
+        curr_state = random.randint(-1, 2)
+        next_obs = np.random.rand(6, 7)
+        reward = random.randint(0, 4)
+        done = True
+        test.add(curr_obs, curr_state, next_obs, reward, done)
+
+    # print(test.sample())
+    # co, cs, no, re, do = test.sample()
