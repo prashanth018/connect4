@@ -13,8 +13,8 @@ YELLOW = (255,255,0)
 ROW_COUNT = 6
 COLUMN_COUNT = 7
 
-PLAYER = 0
-AI = 1
+PLAYER1 = 0
+PLAYER2 = 1
 
 EMPTY = 0
 PLAYER1_PIECE = 1
@@ -225,7 +225,7 @@ pygame.display.update()
 
 myfont = pygame.font.SysFont("monospace", 75)
 
-turn = random.randint(PLAYER, AI)
+turn = random.randint(PLAYER1, PLAYER2)
 
 while not game_over:
 
@@ -236,7 +236,7 @@ while not game_over:
 		if event.type == pygame.MOUSEMOTION:
 			pygame.draw.rect(screen, BLACK, (0,0, width, SQUARESIZE))
 			posx = event.pos[0]
-			if turn == PLAYER:
+			if turn == PLAYER1:
 				pygame.draw.circle(screen, RED, (posx, int(SQUARESIZE/2)), RADIUS)
 
 		pygame.display.update()
@@ -245,7 +245,7 @@ while not game_over:
 			pygame.draw.rect(screen, BLACK, (0,0, width, SQUARESIZE))
 			#print(event.pos)
 			# Ask for Player 1 Input
-			if turn == PLAYER:
+			if turn == PLAYER1:
 				posx = event.pos[0]
 				col = int(math.floor(posx/SQUARESIZE))
 
@@ -266,7 +266,7 @@ while not game_over:
 		'''
 
 	# # Ask for Player 2 Input
-	if turn == AI and not game_over:				
+	if turn == PLAYER2 and not game_over:				
 
 		#col = random.randint(0, COLUMN_COUNT-1)
 		#col = pick_best_move(board, PLAYER2_PIECE)
