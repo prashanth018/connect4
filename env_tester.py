@@ -1,10 +1,15 @@
+from agent import DQNAgent
+
 import numpy as np
 import random
 import pygame
 import sys
 import math
+import time
+import tensorflow as tf
+import matplotlib.pyplot as plt
+tf.enable_eager_execution()
 
-from agent import DQNAgent
 
 BLUE = (0,0,255)
 BLACK = (0,0,0)
@@ -14,12 +19,12 @@ YELLOW = (255,255,0)
 ROW_COUNT = 6
 COLUMN_COUNT = 7
 
-PLAYER = 0
-AI = 1
+PLAYER1 = 0
+PLAYER2 = 1
 
 EMPTY = 0
-PLAYER_PIECE = 1
-AI_PIECE = -1
+PLAYER1_PIECE = 1
+PLAYER2_PIECE = -1
 
 WINDOW_LENGTH = 4
 
@@ -68,9 +73,9 @@ def winning_move(board, piece):
 
 def evaluate_window(window, piece):
 	score = 0
-	opp_piece = PLAYER_PIECE
-	if piece == PLAYER_PIECE:
-		opp_piece = AI_PIECE
+	opp_piece = PLAYER1_PIECE
+	if piece == PLAYER1_PIECE:
+		opp_piece = PLAYER2_PIECE
 
 	if window.count(piece) == 4:
 		score += 100
@@ -120,28 +125,28 @@ def score_position(board, piece):
 	return score
 
 def is_terminal_node(board):
-	return winning_move(board, PLAYER_PIECE) or winning_move(board, AI_PIECE) or len(get_valid_locations(board)) == 0
+	return winning_move(board, PLAYER1_PIECE) or winning_move(board, PLAYER2_PIECE) or len(get_valid_locations(board)) == 0
 
 def minimax(board, depth, alpha, beta, maximizingPlayer):
 	valid_locations = get_valid_locations(board)
 	is_terminal = is_terminal_node(board)
 	if depth == 0 or is_terminal:
 		if is_terminal:
-			if winning_move(board, AI_PIECE):
+			if winning_move(board, PLAYER2_PIECE):
 				return (None, 100000000000000)
-			elif winning_move(board, PLAYER_PIECE):
+			elif winning_move(board, PLAYER1_PIECE):
 				return (None, -10000000000000)
 			else: # Game is over, no more valid moves
 				return (None, 0)
 		else: # Depth is zero
-			return (None, score_position(board, AI_PIECE))
+			return (None, score_position(board, PLAYER2_PIECE))
 	if maximizingPlayer:
 		value = -math.inf
 		column = random.choice(valid_locations)
 		for col in valid_locations:
 			row = get_next_open_row(board, col)
 			b_copy = board.copy()
-			drop_piece(b_copy, row, col, AI_PIECE)
+			drop_piece(b_copy, row, col, PLAYER2_PIECE)
 			new_score = minimax(b_copy, depth-1, alpha, beta, False)[1]
 			if new_score > value:
 				value = new_score
@@ -157,7 +162,7 @@ def minimax(board, depth, alpha, beta, maximizingPlayer):
 		for col in valid_locations:
 			row = get_next_open_row(board, col)
 			b_copy = board.copy()
-			drop_piece(b_copy, row, col, PLAYER_PIECE)
+			drop_piece(b_copy, row, col, PLAYER1_PIECE)
 			new_score = minimax(b_copy, depth-1, alpha, beta, True)[1]
 			if new_score < value:
 				value = new_score
@@ -198,21 +203,39 @@ def draw_board(board):
 	
 	for c in range(COLUMN_COUNT):
 		for r in range(ROW_COUNT):		
-			if board[r][c] == PLAYER_PIECE:
+			if board[r][c] == PLAYER1_PIECE:
 				pygame.draw.circle(screen, RED, (int(c*SQUARESIZE+SQUARESIZE/2), height-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS)
-			elif board[r][c] == AI_PIECE: 
+			elif board[r][c] == PLAYER2_PIECE: 
 				pygame.draw.circle(screen, YELLOW, (int(c*SQUARESIZE+SQUARESIZE/2), height-int(r*SQUARESIZE+SQUARESIZE/2)), RADIUS)
 	pygame.display.update()
+
+
+board = create_board()
+
+player1 = DQNAgent(np.asarray(board))
+player2 = DQNAgent(np.asarray(board))
+
+player1.load_weights('player1.h5')
+player2.load_weights('player2.h5')
+
+player1_wins = []
+player2_wins = []
+player1_disqualifications = []
+player2_disqualifications = []
+draws = []
+
+NUM_GAMES = 1
+TRAIN_AFTER_GAMES = 100
+
+num_wins1 = 0
+num_wins2 = 0
+num_disqualifications1 = 0
+num_disqualifications2 = 0
+
 
 board = create_board()
 print_board(board)
 game_over = False
-
-player1 = DQNAgent(board)
-player2 = DQNAgent(board)
-
-player1.load_weights('player1.h5')
-player2.load_weights('player2.h5')
 
 pygame.init()
 
@@ -231,69 +254,51 @@ pygame.display.update()
 
 myfont = pygame.font.SysFont("monospace", 75)
 
-turn = random.randint(PLAYER, AI)
+turn = random.randint(PLAYER1, PLAYER2)
+
+num_wins1 = 0
+num_wins2 = 0
+num_disqualifications1 = 0
+num_disqualifications2 = 0
+
+player1.save_weights('player1.h5')
+player2.save_weights('player2.h5')
+
+player1.adjust_target_net()
+player2.adjust_target_net()
+
+game_over = False
+
+eps = 0.8
 
 while not game_over:
 
-	for event in pygame.event.get():
-		if event.type == pygame.QUIT:
-			sys.exit()
-
-		if event.type == pygame.MOUSEMOTION:
-			pygame.draw.rect(screen, BLACK, (0,0, width, SQUARESIZE))
-			posx = event.pos[0]
-			if turn == PLAYER:
-				pygame.draw.circle(screen, RED, (posx, int(SQUARESIZE/2)), RADIUS)
-
-		pygame.display.update()
-
-		if event.type == pygame.MOUSEBUTTONDOWN:
-			pygame.draw.rect(screen, BLACK, (0,0, width, SQUARESIZE))
-			#print(event.pos)
-			# Ask for Player 1 Input
-			if turn == PLAYER:
-				posx = event.pos[0]
-				col = int(math.floor(posx/SQUARESIZE))
-
-				if is_valid_location(board, col):
-					row = get_next_open_row(board, col)
-					drop_piece(board, row, col, PLAYER_PIECE)
-
-					if winning_move(board, PLAYER_PIECE):
-						label = myfont.render("Player 1 wins!!", 1, RED)
-						screen.blit(label, (40,10))
-						game_over = True
-
-					turn += 1
-					turn = turn % 2
-
-					print_board(board)
-					draw_board(board)
-
-
-	# # Ask for Player 2 Input
-	if turn == AI and not game_over:				
+	# Ask for Player 2 Input
+	if turn == PLAYER2 and not game_over:				
 
 		#col = random.randint(0, COLUMN_COUNT-1)
-		#col = pick_best_move(board, AI_PIECE)
-		#col, minimax_score = minimax(board, 5, -math.inf, math.inf, True)
-		col = player2.get_action(board)
-		print('col:', col)
+		#col = pick_best_move(board, PLAYER2_PIECE)
+		col = player2.get_action(board, 0)
+		#print('col from DQN:', col)
 
 		if not is_valid_location(board, col):
-			label = myfont.render("Player 2 disqualified!!", 1, YELLOW)
-			screen.blit(label, (40,10))
 			game_over = True
+			reward = -1
+			player2.receive_next_obs_rew_done(board, reward, game_over)
+			num_disqualifications2 += 1
 
 		if is_valid_location(board, col):
-			#pygame.time.wait(500)
+			pygame.time.wait(500)
 			row = get_next_open_row(board, col)
-			drop_piece(board, row, col, AI_PIECE)
+			drop_piece(board, row, col, PLAYER2_PIECE)
 
-			if winning_move(board, AI_PIECE):
-				label = myfont.render("Player 2 wins!!", 1, YELLOW)
-				screen.blit(label, (40,10))
-				game_over = True
+			reward = 0
+
+		if winning_move(board, PLAYER2_PIECE):
+			game_over = True
+			reward = 1	
+			player2.receive_next_obs_rew_done(board, reward, game_over)
+			num_wins2 += 1
 
 		print_board(board)
 		draw_board(board)
@@ -301,5 +306,38 @@ while not game_over:
 		turn += 1
 		turn = turn % 2
 
-	if game_over:
-		pygame.time.wait(3000)
+		player1.receive_next_obs_rew_done(board, -1 * reward, game_over)
+
+	else:
+
+		#col, minimax_score = minimax(board, 5, -math.inf, math.inf, True)
+		col = player1.get_action(board, 0)
+		#print('col from minimax:', col)
+
+		if not is_valid_location(board, col):
+			game_over = True
+			reward = -1
+			player1.receive_next_obs_rew_done(board, reward, game_over)
+			num_disqualifications1 += 1
+
+		if is_valid_location(board, col):
+			pygame.time.wait(500)
+			row = get_next_open_row(board, col)
+			drop_piece(board, row, col, PLAYER1_PIECE)
+
+		reward = 0
+
+		if winning_move(board, PLAYER1_PIECE):
+			game_over = True
+			reward = 1
+			player1.receive_next_obs_rew_done(board, reward, game_over)
+			num_wins1 += 1
+		print_board(board)
+		draw_board(board)
+
+		turn += 1
+		turn = turn % 2
+
+		player2.receive_next_obs_rew_done(board, -1*reward, game_over)
+
+pygame.time.wait(2000)

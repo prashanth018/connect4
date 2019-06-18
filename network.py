@@ -2,9 +2,6 @@ import tensorflow as tf
 from tensorflow import keras
 
 
-tf.enable_eager_execution()
-
-
 def build_network(input_shape, num_outputs):
 	
 	model = keras.models.Sequential()
@@ -25,3 +22,9 @@ if __name__ == '__main__':
 
 	sample_network = build_network(board_state.shape, num_outputs)
 	print(sample_network.predict( np.expand_dims(board_state, axis=0) ))
+
+	board_state1 = np.random.randint(-1, 2, size=(6, 7))
+	board_state2 = np.random.randint(-1, 2, size=(6, 7))
+
+	assert ( sample_network.predict( np.expand_dims(board_state1, axis=0) ) != \
+		   	 sample_network.predict( np.expand_dims(board_state2, axis=0) ) ).all()

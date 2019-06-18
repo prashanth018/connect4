@@ -6,7 +6,7 @@ import numpy as np
 class Memory:
 
     def __init__(self, batch_size=32):
-        self.buffer = deque(maxlen=10000)
+        self.buffer = deque(maxlen=100000)
         self.batch_size = batch_size
         self.Sample = namedtuple('Sample', ['current_obs', 'current_action', 'next_obs', 'reward', 'done'])
 
@@ -17,7 +17,7 @@ class Memory:
         self.buffer.append(self.Sample(curr_obs, curr_action, next_obs, reward, done))
 
     def sample(self):
-        rand_samp = random.sample(self.buffer, self.batch_size)
+        rand_samp = random.sample(list(self.buffer), self.batch_size)
 
         current_obs = []
         current_action = []
@@ -32,10 +32,10 @@ class Memory:
             reward.append(rand_samp[i].reward)
             done.append(rand_samp[i].done)
 
-        current_obs = np.asarray(current_obs)
-        current_action = np.asarray(current_action)
-        next_obs = np.asarray(next_obs)
-        reward = np.asarray(reward)
+        current_obs = np.asarray(current_obs, dtype=np.float32)
+        current_action = np.asarray(current_action, dtype=np.int32)
+        next_obs = np.asarray(next_obs, dtype=np.float32)
+        reward = np.asarray(reward, dtype=np.float32)
         done = np.asarray(done)
 
         return current_obs, current_action, next_obs, reward, done
