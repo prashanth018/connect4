@@ -8,7 +8,7 @@ from memory import Memory
 
 class DQNAgent():
 
-	def __init__(self, board_state, batch_size=32):
+	def __init__(self, board_state, batch_size=256):
 		''' 
 			Constructor for DQNAgent
 			Input: board_state, (for getting the input_shape of teh network we will train)
@@ -19,7 +19,6 @@ class DQNAgent():
 		self.net = build_network(input_shape=board_state.shape, num_outputs=self.n_actions)
 		self.target_net = build_network(input_shape=board_state.shape, num_outputs=self.n_actions)
 		self.target_net.set_weights(self.net.get_weights())
-		self.target_net.trainable = False
 		self.net_optimizer = tf.train.AdamOptimizer()
 
 		self.memory = Memory(batch_size)
@@ -36,8 +35,9 @@ class DQNAgent():
 		action = None
 		if np.random.uniform() < epsilon:
 			action = np.random.randint(low=0, high=self.n_actions)
-		q_vals = self.net.predict( np.expand_dims(board_state, axis=0) )[0]
-		action = np.argmax( q_vals )
+		else:
+			q_vals = self.net.predict( np.expand_dims(board_state, axis=0) )[0]
+			action = np.argmax( q_vals )
 		self.curr_action = action
 		return self.curr_action
 
@@ -58,26 +58,38 @@ class DQNAgent():
 
 	def train_one_batch(self, gamma):
 		curr_obs, curr_actions, next_obs, rewards, dones = self.memory.sample()
-		curr_actions = tf.one_hot(curr_actions, depth=self.n_actions, dtype=tf.int32)
-		next_qvals = tf.max(self.target_net.predict(next_obs), axis=1)
+		curr_actions = tf.one_hot(curr_actions, depth=self.n_actions, dtype=tf.float32)
+		next_qvals = tf.reduce_max(self.target_net.predict(next_obs), axis=1)
 		targets = next_qvals * gamma + rewards
-		
+
 		with tf.GradientTape() as t:
-			curr_qvals = self.net.predict(curr_obs)
-			curr_qvals = tf.sum(curr_actions * curr_qvals, axis=1)
-			loss = tf.reduce_mean((targets - curr_qvals) ** 2)
+			curr_qvals = self.net(curr_obs)
+			selected_qvals = tf.reduce_sum(tf.multiply(curr_qvals, curr_actions), axis=1)
+			loss = tf.losses.mean_squared_error(selected_qvals, targets)
 
-		grad = t.gradient(loss, net.trainable_variables)
-		self.net_optimizer.apply_gradients(zip(grads, self.net.trainable_variables))
+			grads = t.gradient(loss, self.net.trainable_variables)
+			self.net_optimizer.apply_gradients(zip(grads, self.net.trainable_variables))
+
+		return loss.numpy()
 
 
-	def train(self, gamma=0.95, num_epochs=1000):
+	def train(self, gamma=0.95, num_epochs=100):
 		losses = []
 		for epoch in range(num_epochs):
 			loss = self.train_one_batch(gamma)
 			losses.append(loss)
 		self.target_net.set_weights(self.net.get_weights())
 		return np.mean(losses)
+
+	def save_weights(self, fname):
+		self.net.save_weights(fname)
+
+	def adjust_target_net(self):
+		self.target_net.set_weights(self.net.get_weights())
+
+	def load_weights(self, fname):
+		self.net.load_weights(fname)
+		self.target_net.load_weights(fname)
 
 
 
